@@ -1,3 +1,6 @@
-oanda
 .idea
 venv
+data
+constants
+.ipynb_c*
+__pycache__
