@@ -37,4 +37,4 @@ class Instruments:
         print(len(self.instruments_dict.keys()), "instruments")
 
 
-instruments = Instruments() # singleton
+instrument_collection = Instruments() # singleton
