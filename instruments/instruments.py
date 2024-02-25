@@ -2,7 +2,7 @@ import json
 from .instrument import Instrument
 
 
-class Instruments:
+class InstrumentCollection:
     _filename = "instruments.json"
     _keys = ['name', 'type', 'displayName', 'pipLocation',
                 'displayPrecision', 'tradeUnitsPrecision', 'marginRate']
@@ -12,7 +12,7 @@ class Instruments:
 
     def load_instruments(self, path):
         self.instruments_dict = {}
-        filename = f"{path}/{Instruments._filename}"
+        filename = f"{path}/{InstrumentCollection._filename}"
         with open(filename, "r") as f:
             data = json.loads(f.read())
             for k, v in data.items():
@@ -26,9 +26,9 @@ class Instruments:
         instruments_dict = {}
         for i in data:
             key = i['name']
-            instruments_dict[key] = {k: i[k] for k in Instruments._keys}
+            instruments_dict[key] = {k: i[k] for k in InstrumentCollection._keys}
 
-        filename = f"{path}/{Instruments._filename}"
+        filename = f"{path}/{InstrumentCollection._filename}"
         with open(filename, "w") as f:
             f.write(json.dumps(instruments_dict, indent=2))
 
@@ -37,4 +37,4 @@ class Instruments:
         print(len(self.instruments_dict.keys()), "instruments")
 
 
-instrument_collection = Instruments() # singleton
+instrument_collection = InstrumentCollection() # singleton

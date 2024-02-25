@@ -1,6 +1,7 @@
 .idea
 venv
-data
+data/*
+!data/collect_data.py
 constants
 .ipynb_c*
 __pycache__
