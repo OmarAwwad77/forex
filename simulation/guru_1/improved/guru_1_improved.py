@@ -1,7 +1,7 @@
 import pandas as pd
 import datetime as dt
 from technical.indicators import rsi
-from technical.patterns import apply_patterns
+from technical.udemy_patterns import apply_patterns
 from simulation.guru_1.common import BUY, SELL, NONE, apply_signal, apply_signals
 
 class Trade:

@@ -1,128 +1,225 @@
 import pandas as pd
+import pandas as pd
+import decimal
+from dateutil import parser
+from exploration.plotting import CandlePlot
+import plotly.graph_objects as go
+import simulation.supply_and_demand.supply_and_demand as sd
 
-HANGING_MAN_BODY = 15.0
-HANGING_MAN_HEIGHT = 75.0
-SHOOTING_STAR_HEIGHT = 25.0
-SPINNING_TOP_MIN = 40.0
-SPINNING_TOP_MAX = 60.0
-MARUBOZU = 98.0
-ENGULFING_FACTOR = 1.1
 
-MORNING_STAR_PREV2_BODY = 90.0
-MORNING_STAR_PREV_BODY = 10.0
+def is_star_candle(row: pd.Series, prev: pd.Series, next: pd.Series):
+    prev_body_height = abs(prev['mid_o'] - prev['mid_c'])
+    next_body_height = abs(next['mid_o'] - next['mid_c'])
+    star_body_height = abs(row['mid_o'] - row['mid_c'])
+    min_height = min(prev_body_height, next_body_height)
 
-TWEEZER_BODY = 15.0
-TWEEZER_HL = 0.01
-TWEEZER_TOP_BODY = 40.0
-TWEEZER_BOTTOM_BODY = 60.0
-
-apply_marubozu = lambda x: x.body_perc > MARUBOZU
-
-def apply_hanging_man(row):
-    if row.body_bottom_perc > HANGING_MAN_HEIGHT:
-        if row.body_perc < HANGING_MAN_BODY:
-            return True
+    if min_height and round(star_body_height / min_height) <= 0.25:
+        return True
     return False
 
-def apply_shooting_star(row):
-    if row.body_top_perc < SHOOTING_STAR_HEIGHT:
-        if row.body_perc < HANGING_MAN_BODY:
+
+def is_small_candle(row: pd.Series):
+    s = 0.00015
+    if row['mid_c'] > row['mid_o']:  # green
+        if row['mid_c'] <= row['mid_o'] + (row['mid_o'] * s):
             return True
+    else:  # red
+        if row['mid_c'] >= row['mid_o'] - (row['mid_o'] * s):
+            return True
+
+
+def is_big_candle(row: pd.Series):
+    b = 0.00035
+    if row['mid_c'] > row['mid_o']:  # green
+        # print(row['mid_c'],  row['mid_o'] + (row['mid_o'] * b))
+        if row['mid_c'] >= row['mid_o'] + (row['mid_o'] * b):
+            return True
+    else:  # red
+        if row['mid_c'] <= row['mid_o'] - (row['mid_o'] * b):
+            return True
+
+
+def highlight_candles(df: pd.DataFrame, indexes, color='#0066FF'):
+    cp = CandlePlot(df, candles=True)
+    df_temp = cp.df_plot[cp.df_plot.index.isin(indexes)]
+    cp.fig.add_trace(go.Candlestick(
+        x=df_temp.sTime,
+        open=df_temp.mid_o,
+        high=df_temp.mid_h,
+        low=df_temp.mid_l,
+        close=df_temp.mid_c,
+        line=dict(width=1), opacity=1,
+        increasing_fillcolor=color,
+        decreasing_fillcolor=color,
+        increasing_line_color=color,
+        decreasing_line_color=color
+    ))
+
+    cp.show_plot(width=1100, height=500)
+
+
+def get_body_perc(row: pd.Series):
+    full_height = row['mid_h'] - row['mid_l']
+    body_height = abs(row['mid_o'] - row['mid_c'])
+    return body_height / full_height * 100
+
+
+def is_hammer(row: pd.Series, head_perc_limit: float = 25, high_to_head_perc_limit: float = 5, debug=False):
+    full_height = row['mid_h'] - row['mid_l']
+
+    max_body_price = max(row['mid_o'], row['mid_c'])
+    min_body_price = min(row['mid_o'], row['mid_c'])
+
+    head_perc = (row['mid_h'] - min_body_price) / full_height * 100
+    high_to_head_perc = (row['mid_h'] - max_body_price) / full_height * 100
+
+    if debug:
+        print(f'{head_perc} <= {head_perc_limit} -> {head_perc <= head_perc_limit}')
+        print(f'{high_to_head_perc} <= {high_to_head_perc_limit} -> {high_to_head_perc <= high_to_head_perc_limit}')
+
+    if head_perc <= head_perc_limit and high_to_head_perc <= high_to_head_perc_limit:
+        return True
+
     return False
 
-def apply_spinning_top(row):
-    if row.body_top_perc < SPINNING_TOP_MAX:
-        if row.body_bottom_perc > SPINNING_TOP_MIN:
-            if row.body_perc < HANGING_MAN_BODY:
+
+def is_bullish_engulfing(row: pd.Series, df: pd.DataFrame):
+    curr_idx = row.name
+    prev_idx = curr_idx - 1
+    if prev_idx not in df.index:
+        return False
+
+    prev_row = df.iloc[prev_idx]
+    # prev is red
+    if prev_row['mid_c'] - prev_row['mid_o'] < 0:
+        # curr is green
+        if row['mid_c'] - row['mid_o'] > 0:
+            # curr is bigger than prev
+            curr_body_height = row['mid_c'] - row['mid_o']
+            prev_body_height = prev_row['mid_o'] - prev_row['mid_c']
+            if curr_body_height > prev_body_height:
                 return True
     return False
 
-def apply_engulfing(row):
-    if row.direction != row.direction_prev:
-        if row.body_size > row.body_size_prev * ENGULFING_FACTOR:
-            return True
+
+def is_piercing(row: pd.Series, df: pd.DataFrame):
+    curr_idx = row.name
+    prev_idx = curr_idx - 1
+    if prev_idx not in df.index:
+        return False
+
+    prev_row = df.iloc[prev_idx]
+    # prev is red
+    if prev_row['mid_c'] - prev_row['mid_o'] < 0:
+        # curr is green
+        if row['mid_c'] - row['mid_o'] > 0:
+            # body mid point of red
+            prev_body_distance = prev_row['mid_o'] - prev_row['mid_c']
+            prev_body_mid_point = (prev_body_distance / 2) + prev_row['mid_c']
+            if row['mid_c'] >= prev_body_mid_point:
+                return True
     return False
 
-def apply_tweezer_top(row):
-    if abs(row.body_size_change) < TWEEZER_BODY:
-        if row.direction == -1 and row.direction != row.direction_prev:
-            if abs(row.low_change) < TWEEZER_HL and abs(row.high_change) < TWEEZER_HL:
-                if row.body_top_perc < TWEEZER_TOP_BODY:
+
+def is_morning_star(row: pd.Series, df: pd.DataFrame):
+    curr_idx = row.name
+    prev_idx = curr_idx - 1
+    before_prev_idx = prev_idx - 1
+
+    if before_prev_idx not in df.index:
+        return False
+
+    prev_row = df.iloc[prev_idx]
+    before_prev_row = df.iloc[before_prev_idx]
+
+    # before_prev is red and big
+    if before_prev_row['mid_c'] - before_prev_row['mid_o'] < 0:
+        # prev is small
+        if is_star_candle(prev_row, before_prev_row, row):
+            # curr is green and big
+            if row['mid_c'] - row['mid_o'] > 0:
+                before_prev_body_distance = before_prev_row['mid_o'] - before_prev_row['mid_c']
+                before_prev_body_mid_point = (before_prev_body_distance / 2) + before_prev_row['mid_c']
+                if row['mid_c'] >= before_prev_body_mid_point:
                     return True
-    return False               
-
-def apply_tweezer_bottom(row):
-    if abs(row.body_size_change) < TWEEZER_BODY:
-        if row.direction == 1 and row.direction != row.direction_prev:
-            if abs(row.low_change) < TWEEZER_HL and abs(row.high_change) < TWEEZER_HL:
-                if row.body_bottom_perc > TWEEZER_BOTTOM_BODY:
-                    return True
-    return False     
-
-
-def apply_morning_star(row, direction=1):
-    if row.body_perc_prev_2 > MORNING_STAR_PREV2_BODY:
-        if row.body_perc_prev < MORNING_STAR_PREV_BODY:
-            if row.direction == direction and row.direction_prev_2 != direction:
-                if direction == 1:
-                    if row.mid_c > row.mid_point_prev_2:
-                        return True
-                else:
-                    if row.mid_c < row.mid_point_prev_2:
-                        return True
     return False
 
-def apply_candle_props(df: pd.DataFrame):
 
-    df_an = df.copy()
-    direction = df_an.mid_c - df_an.mid_o
-    body_size = abs(direction)
-    direction = [1 if x >= 0 else -1 for x in direction]
-    full_range = df_an.mid_h - df_an.mid_l
-    body_perc = (body_size / full_range) * 100
-    body_lower = df_an[['mid_c','mid_o']].min(axis=1)
-    body_upper = df_an[['mid_c','mid_o']].max(axis=1)
-    body_bottom_perc = ((body_lower - df_an.mid_l) / full_range) * 100
-    body_top_perc = 100 - ((( df_an.mid_h - body_upper) / full_range) * 100)
+def is_shooting_star(row: pd.Series, head_perc_limit: float = 25, low_to_head_perc_limit: float = 5, debug=False):
+    full_height = row['mid_h'] - row['mid_l']
 
-    mid_point = full_range / 2 + df_an.mid_l
+    max_body_price = max(row['mid_o'], row['mid_c'])
+    min_body_price = min(row['mid_o'], row['mid_c'])
+    head_perc = abs(row['mid_l'] - max_body_price) / full_height * 100
+    low_to_head_perc = abs(row['mid_l'] - min_body_price) / full_height * 100
 
-    low_change = df_an.mid_l.pct_change() * 100
-    high_change = df_an.mid_h.pct_change() * 100
-    body_size_change = body_size.pct_change() * 100
+    if debug:
+        print(f'{head_perc} <= {head_perc_limit} -> {head_perc <= head_perc_limit}')
+        print(f'{low_to_head_perc} <= {low_to_head_perc_limit} -> {low_to_head_perc <= low_to_head_perc_limit}')
 
-    df_an['body_lower'] = body_lower
-    df_an['body_upper'] = body_upper
-    df_an['body_bottom_perc'] = body_bottom_perc
-    df_an['body_top_perc'] = body_top_perc
-    df_an['body_perc'] = body_perc
-    df_an['direction'] = direction
-    df_an['body_size'] = body_size
-    df_an['low_change'] = low_change
-    df_an['high_change'] = high_change
-    df_an['body_size_change'] = body_size_change
-    df_an['mid_point'] = mid_point
-    df_an['mid_point_prev_2'] = mid_point.shift(2)
-    df_an['body_size_prev'] = df_an.body_size.shift(1)
-    df_an['direction_prev'] = df_an.direction.shift(1)
-    df_an['direction_prev_2'] = df_an.direction.shift(2)
-    df_an['body_perc_prev'] = df_an.body_perc.shift(1)
-    df_an['body_perc_prev_2'] = df_an.body_perc.shift(2)
+    if head_perc <= head_perc_limit and low_to_head_perc <= low_to_head_perc_limit:
+        return True
 
-    return df_an
+    return False
 
-def set_candle_patterns(df_an: pd.DataFrame):
-    df_an['HANGING_MAN'] = df_an.apply(apply_hanging_man, axis=1)
-    df_an['SHOOTING_STAR'] = df_an.apply(apply_shooting_star, axis=1)
-    df_an['SPINNING_TOP'] = df_an.apply(apply_spinning_top, axis=1)
-    df_an['MARUBOZU'] = df_an.apply(apply_marubozu, axis=1)
-    df_an['ENGULFING'] = df_an.apply(apply_engulfing, axis=1)
-    df_an['TWEEZER_TOP'] = df_an.apply(apply_tweezer_top, axis=1)
-    df_an['TWEEZER_BOTTOM'] = df_an.apply(apply_tweezer_bottom, axis=1)
-    df_an['MORNING_STAR'] = df_an.apply(apply_morning_star, axis=1)
-    df_an['EVENING_STAR'] = df_an.apply(apply_morning_star, axis=1, direction=-1)
 
-def apply_patterns(df: pd.DataFrame):
-    df_an = apply_candle_props(df)
-    set_candle_patterns(df_an)
-    return df_an
+def is_bearish_engulfing(row: pd.Series, df: pd.DataFrame):
+    curr_idx = row.name
+    prev_idx = curr_idx - 1
+    if prev_idx not in df.index:
+        return False
+
+    prev_row = df.iloc[prev_idx]
+    # prev is green
+    if prev_row['mid_c'] - prev_row['mid_o'] > 0:
+        # curr is red
+        if row['mid_c'] - row['mid_o'] < 0:
+            # curr is bigger than prev
+            curr_body_height = row['mid_o'] - row['mid_c']
+            prev_body_height = prev_row['mid_c'] - prev_row['mid_o']
+            if curr_body_height > prev_body_height:
+                return True
+    return False
+
+
+def is_dark_cloud(row: pd.Series, df: pd.DataFrame):
+    curr_idx = row.name
+    prev_idx = curr_idx - 1
+    if prev_idx not in df.index:
+        return False
+
+    prev_row = df.iloc[prev_idx]
+    # prev is green
+    if prev_row['mid_c'] - prev_row['mid_o'] > 0:
+        # curr is red
+        if row['mid_c'] - row['mid_o'] < 0:
+            # body mid point of green
+            prev_body_distance = prev_row['mid_c'] - prev_row['mid_o']
+            prev_body_mid_point = (prev_body_distance / 2) + prev_row['mid_o']
+            if row['mid_c'] <= prev_body_mid_point:
+                return True
+    return False
+
+
+def is_evening_star(row: pd.Series, df: pd.DataFrame):
+    curr_idx = row.name
+    prev_idx = curr_idx - 1
+    before_prev_idx = prev_idx - 1
+
+    if before_prev_idx not in df.index:
+        return False
+
+    prev_row = df.iloc[prev_idx]
+    before_prev_row = df.iloc[before_prev_idx]
+
+    # before_prev is green
+    if before_prev_row['mid_c'] - before_prev_row['mid_o'] > 0:
+        # prev is small
+        if is_star_candle(prev_row, before_prev_row, row):
+            # curr is red
+            if row['mid_c'] - row['mid_o'] < 0:
+                before_prev_body_height = before_prev_row['mid_c'] - before_prev_row['mid_o']
+                before_prev_body_mid_point = (before_prev_body_height / 2) + before_prev_row['mid_o']
+                if row['mid_c'] <= before_prev_body_mid_point:
+                    return True
+    return False
