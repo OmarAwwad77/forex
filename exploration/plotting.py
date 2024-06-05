@@ -2,6 +2,7 @@ import datetime as dt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+
 class CandlePlot:
 
     def __init__(self, df, candles=True):
@@ -24,6 +25,7 @@ class CandlePlot:
                 low=self.df_plot.mid_l,
                 close=self.df_plot.mid_c,
                 line=dict(width=1), opacity=1,
+                hovertext=self.df_plot.index,
                 increasing_fillcolor='#24A06B',
                 decreasing_fillcolor="#CC2E3C",
                 increasing_line_color='#2EC886',  

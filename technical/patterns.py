@@ -1,15 +1,19 @@
 import pandas as pd
-import pandas as pd
-import decimal
-from dateutil import parser
 from exploration.plotting import CandlePlot
 import plotly.graph_objects as go
-import simulation.supply_and_demand.supply_and_demand as sd
 
 
-def is_star_candle(row: pd.Series, prev: pd.Series, next: pd.Series):
+def is_bearish_pattern(row: pd.Series, df: pd.DataFrame):
+    return is_shooting_star(row) or is_bearish_engulfing(row, df) or is_dark_cloud(row, df) or is_evening_star(row, df)
+
+
+def is_bullish_pattern(row: pd.Series, df: pd.DataFrame):
+    return is_hammer(row) or is_piercing(row, df) or is_morning_star(row, df) or is_bullish_engulfing(row, pd)
+
+
+def is_star_candle(row: pd.Series, prev: pd.Series, next_c: pd.Series):
     prev_body_height = abs(prev['mid_o'] - prev['mid_c'])
-    next_body_height = abs(next['mid_o'] - next['mid_c'])
+    next_body_height = abs(next_c['mid_o'] - next_c['mid_c'])
     star_body_height = abs(row['mid_o'] - row['mid_c'])
     min_height = min(prev_body_height, next_body_height)
 
