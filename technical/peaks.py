@@ -7,7 +7,10 @@ import plotly.graph_objects as go
 
 from exploration.plotting import CandlePlot
 
-PeakType = Enum('PeakType', ['UP', 'DOWN'])
+class PeakType(Enum):
+    UP = 1
+    DOWN = 2
+# PeakType = Enum('PeakType', ['UP', 'DOWN'])
 
 
 @dataclass

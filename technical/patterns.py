@@ -8,7 +8,7 @@ def is_bearish_pattern(row: pd.Series, df: pd.DataFrame):
 
 
 def is_bullish_pattern(row: pd.Series, df: pd.DataFrame):
-    return is_hammer(row) or is_piercing(row, df) or is_morning_star(row, df) or is_bullish_engulfing(row, pd)
+    return is_hammer(row) or is_piercing(row, df) or is_morning_star(row, df) or is_bullish_engulfing(row, df)
 
 
 def is_star_candle(row: pd.Series, prev: pd.Series, next_c: pd.Series):
