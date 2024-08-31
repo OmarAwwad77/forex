@@ -4,13 +4,15 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from exploration.plotting import CandlePlot
-from strategies.Trade import Trade
+from strategies.Trade import Trade, TradeStatus, TradeOutcome
 from strategies.strategy import Strategy
 
 class Simulation:
-    def __init__(self, strategy: Strategy, df: pd.DataFrame):
+    def __init__(self, strategy: Strategy, df: pd.DataFrame, df_smaller: pd.DataFrame, delta_in_mins: int):
         self.strategy = strategy
         self.df = df
+        self.df_smaller = df_smaller
+        self.delta_in_mins = delta_in_mins
 
     def plot_trades(self, trades: List[Trade], hover_txt_callback: Callable[[Dict], str]):
         cp = CandlePlot(self.df, candles=True)
@@ -59,8 +61,8 @@ class Simulation:
 
             for open_trade_idx, open_trade in enumerate(open_trades):
                 row_idx = self.df.index.get_loc(row.name)
-                open_trade.update(row_idx, row)
-                if open_trade.status == Trade.CLOSED:
+                open_trade.update(row_idx, row, self.df_smaller, self.delta_in_mins)
+                if open_trade.status == TradeStatus.CLOSED:
                     indices_to_close.append(open_trade_idx)
                     closed_trades.append(open_trade)
 
@@ -72,10 +74,10 @@ class Simulation:
             if trade:
                 open_trades.append(trade)
 
-        bad_trades = [t for t in closed_trades if t.outcome == Trade.LOSS]
+        bad_trades = [t for t in closed_trades if t.outcome == TradeOutcome.LOSS]
         bad_trades_len = len(bad_trades)
         closed_trades_len = len(closed_trades)
 
         print(
-            f'{bad_trades_len} ({bad_trades_len / closed_trades_len * 100:.2f}%) bad_trades_len out of : {closed_trades_len} trades')
+            f'{bad_trades_len} ({bad_trades_len / closed_trades_len * 100:.2f}%) wrong trades taken out of: {closed_trades_len} trades in total')
         return open_trades, closed_trades

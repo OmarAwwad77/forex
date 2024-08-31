@@ -1,8 +1,7 @@
 import pandas as pd
 from typing_extensions import override, Optional
 
-from simulation.simulation import Simulation
-from strategies.Trade import Trade
+from strategies.Trade import Trade, SignalType
 from strategies.strategy import Strategy
 from technical.peaks import get_peak, PeakType
 from technical.patterns import is_bullish_pattern, is_bearish_pattern
@@ -58,7 +57,7 @@ class SupplyDemandStrategy(Strategy):
                         sl_price = max(curr_close - sl_distance, df.iloc[peak_two.high_low_idx]['mid_l'])
                         trade_peaks = [peak_one, peak_two, peak_three, peak_four]
                         return Trade(tp=tp_price, sl=sl_price, entry_price=row['ask_c'], data={'peaks': trade_peaks},
-                                     entry_idx=row_idx, entry_time=row.time, signal=Trade.BUY)
+                                     entry_idx=row_idx, entry_time=row.time, signal=SignalType.BUY)
 
             if (
                     peak_one.type == PeakType.DOWN and
@@ -85,4 +84,4 @@ class SupplyDemandStrategy(Strategy):
                         sl_price = min(curr_close + sl_distance, df.iloc[peak_two.high_low_idx]['mid_h'])
                         trade_peaks = [peak_one, peak_two, peak_three, peak_four]
                         return Trade(tp=tp_price, sl=sl_price, entry_price=row['bid_c'], data={'peaks': trade_peaks},
-                                     entry_idx=row_idx, entry_time=row.time, signal=Trade.SELL)
+                                     entry_idx=row_idx, entry_time=row.time, signal=SignalType.SELL)
