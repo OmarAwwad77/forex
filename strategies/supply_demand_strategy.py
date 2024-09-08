@@ -1,7 +1,7 @@
 import pandas as pd
 from typing_extensions import override, Optional
 
-from strategies.Trade import Trade, SignalType
+from simulator.trade import Trade, SignalType
 from strategies.strategy import Strategy
 from technical.peaks import get_peak, PeakType
 from technical.patterns import is_bullish_pattern, is_bearish_pattern

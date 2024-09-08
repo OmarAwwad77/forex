@@ -1,5 +1,4 @@
-from simulation.guru_1.original import guru_1_original
-from simulation.guru_1.improved import guru_1_improved
+from simulations.guru_1.original import guru_1_original
 
 if __name__ == '__main__':
     guru_1_original.run()

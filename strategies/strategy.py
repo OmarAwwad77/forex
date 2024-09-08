@@ -3,7 +3,7 @@ from typing import Optional
 
 import pandas as pd
 
-from strategies.Trade import Trade
+from simulator.trade import Trade
 
 
 class Strategy(ABC):
