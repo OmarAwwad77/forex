@@ -77,6 +77,8 @@ class Simulator:
 
             trade = self.strategy.apply_signal(row, self.df)
             if trade:
+                if open_trades and trade.data == open_trades[-1].data:
+                    continue
                 open_trades.append(trade)
 
         bad_trades = [t for t in closed_trades if t.outcome == TradeOutcome.LOSS]
