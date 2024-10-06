@@ -12,6 +12,6 @@ class Strategy(ABC):
         self.iteration_data = iteration_data
 
     @abstractmethod
-    def apply_signal(self, row: pd.Series, df: pd.DataFrame) -> Optional[Trade]:
+    def apply_signal(self, row: pd.Series, df: pd.DataFrame, df_lower: pd.DataFrame, delta_in_mins: int) -> Optional[Trade]:
         pass
 

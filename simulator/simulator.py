@@ -75,7 +75,7 @@ class Simulator:
                 idx_to_remove = indices_to_close[j]
                 open_trades.remove(open_trades[idx_to_remove])
 
-            trade = self.strategy.apply_signal(row, self.df)
+            trade = self.strategy.apply_signal(row, self.df, self.df_smaller, self.delta_in_mins)
             if trade:
                 if open_trades and trade.data == open_trades[-1].data:
                     continue
