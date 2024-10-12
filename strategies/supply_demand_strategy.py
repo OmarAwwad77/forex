@@ -8,7 +8,7 @@ from technical.patterns import is_bullish_pattern, is_bearish_pattern
 
 class SupplyDemandStrategy(Strategy):
     @override
-    def apply_signal(self, row: pd.Series, df: pd.DataFrame) -> Optional[Trade]:
+    def apply_signal(self, row: pd.Series, df: pd.DataFrame, df_lower: pd.DataFrame, delta_in_mins: int) -> Optional[Trade]:
         peaks = []
         row_idx = df.index.get_loc(row.name)
         window_start = max(0, row_idx - 100)
@@ -43,19 +43,24 @@ class SupplyDemandStrategy(Strategy):
                 peak_three_price = max(df.iloc[peak_three.idx]['mid_o'], df.iloc[peak_three.idx]['mid_c'])
                 peak_four_price = min(df.iloc[peak_four.idx]['mid_o'], df.iloc[peak_four.idx]['mid_c'])
 
+                before_peak_four = df.iloc[max(0, peak_four.idx - 24): peak_four.idx]
+                max_price_before_peak_four = max(before_peak_four[['mid_c', 'mid_o']].max())
+                up_trend_before_beak_four = (peak_three_price - peak_three_price * 0.001) >= max_price_before_peak_four
+
                 if (
                         peak_one_price >= peak_three_price and
                         peak_two_price >= peak_four_price and
                         peak_two_price <= min_between_peak_one_and_row and
-                        peak_one_price >= max_between_peak_one_and_row
+                        peak_one_price >= max_between_peak_one_and_row and
+                        # up_trend_before_beak_four and
+                        peak_four_price - (peak_four_price * 0.002) >= df.iloc[max(peak_four.idx - 48, 0)]['mid_c']
                 ):
-                    tp_price = df.iloc[peak_one.high_low_idx]['mid_h']
-
-                    if curr_close + curr_close * 0.00125 <= tp_price:
-                        tp_distance = abs(curr_close - tp_price)
-                        sl_distance = tp_distance / self.risk_to_reward
-                        sl_price = max(curr_close - sl_distance, df.iloc[peak_two.high_low_idx]['mid_l'])
-                        trade_peaks = [peak_one, peak_two, peak_three, peak_four]
+                    sl_price = df.iloc[peak_four.high_low_idx]['mid_l']
+                    sl_distance = curr_close - sl_price
+                    tp_price = curr_close + sl_distance
+                    # tp_price = df.iloc[peak_one.high_low_idx]['mid_h']
+                    trade_peaks = [peak_one, peak_two, peak_three, peak_four]
+                    if curr_close + curr_close * 0.00125 <= tp_price and ((peak_one_price - peak_two_price) * 0.25 + peak_two_price) >= curr_close:
                         return Trade(tp=tp_price, sl=sl_price, entry_price=row['ask_c'], data={'peaks': trade_peaks},
                                      entry_idx=row_idx, entry_time=row.time, signal=SignalType.BUY)
 
@@ -71,17 +76,23 @@ class SupplyDemandStrategy(Strategy):
                 peak_three_price = min(df.iloc[peak_three.idx]['mid_o'], df.iloc[peak_three.idx]['mid_c'])
                 peak_four_price = max(df.iloc[peak_four.idx]['mid_o'], df.iloc[peak_four.idx]['mid_c'])
 
+                before_peak_four = df.iloc[max(0, peak_four.idx - 24): peak_four.idx]
+                min_price_before_peak_four = min(before_peak_four[['mid_c', 'mid_o']].min())
+                down_trend_before_beak_four = (peak_three_price + peak_three_price * 0.001) <= min_price_before_peak_four
+
                 if (
                         peak_one_price <= peak_three_price and
                         peak_two_price <= peak_four_price and
                         peak_one_price <= min_between_peak_one_and_row and
-                        peak_two_price >= max_between_peak_one_and_row
+                        peak_two_price >= max_between_peak_one_and_row and
+                        # down_trend_before_beak_four and
+                        peak_four_price + (peak_four_price * 0.002) <= df.iloc[max(peak_four.idx - 48, 0)]['mid_c']
                 ):
-                    tp_price = df.iloc[peak_one.high_low_idx]['mid_l']
-                    if curr_close - curr_close * 0.00125 >= tp_price:
-                        tp_distance = abs(curr_close - tp_price)
-                        sl_distance = tp_distance / self.risk_to_reward
-                        sl_price = min(curr_close + sl_distance, df.iloc[peak_two.high_low_idx]['mid_h'])
-                        trade_peaks = [peak_one, peak_two, peak_three, peak_four]
+                    sl_price = df.iloc[peak_four.high_low_idx]['mid_h']
+                    sl_distance = sl_price - curr_close
+                    tp_price = curr_close - sl_distance
+                    # tp_price = df.iloc[peak_one.high_low_idx]['mid_l']
+                    trade_peaks = [peak_one, peak_two, peak_three, peak_four]
+                    if curr_close - curr_close * 0.00125 >= tp_price and ((peak_two_price - peak_one_price) * 0.25 + peak_one_price) <= curr_close:
                         return Trade(tp=tp_price, sl=sl_price, entry_price=row['bid_c'], data={'peaks': trade_peaks},
                                      entry_idx=row_idx, entry_time=row.time, signal=SignalType.SELL)

@@ -83,10 +83,10 @@ def get_peak_lowest_low(df: pd.DataFrame, peak: Peak):
     return df.iloc[peak.start_idx + 1: peak.end_idx]['mid_l'].min()
 
 
-def get_peaks(df: pd.DataFrame) -> List[Peak]:
+def get_peaks(df: pd.DataFrame, *args, **kwargs) -> List[Peak]:
     peaks = []
     for i in range(len(df)):
-        peak = get_peak(df, i)
+        peak = get_peak(df, i, *args, **kwargs)
         if peak:
             peaks.append(peak)
     return peaks
